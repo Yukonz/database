@@ -15,10 +15,10 @@ echo "Connected successfully<br>";
 $sql = "CREATE TABLE Users (
         id              INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY, 
         login           VARCHAR(30) NOT NULL,
-        password        VARCHAR(30) NOT NULL,
+        password        VARCHAR(50) NOT NULL,
         date_register   VARCHAR(30) NOT NULL,
         date_last_visit VARCHAR(30) NOT NULL,
-        ip              INT(8) NOT NULL,
+        ip              BIGINT(128) NOT NULL,
         active          BOOLEAN DEFAULT NULL
 )";
 $connect->query($sql);
@@ -132,17 +132,33 @@ function generate_visit_date($register_date)
     return $visit_date;
 }
 
+$sql ="INSERT INTO Users (login, password, date_register, date_last_visit, ip) VALUES ";
 
-for ($i=0; $i<50; $i++){
+$userCount = 100;
+
+for ($i=0; $i<$userCount; $i++){
+
     $login = generate_login(10);
     $password = generate_password(15);
     $ip = generate_ip(255);
     $reg_date = generate_register_date();
     $visit_date = generate_visit_date($reg_date);
 
-    echo "<hr>Login: " . $login . "<br>";
-    echo "Pass: " . $password . "<br>";
-    echo "Ip: " . long2ip($ip) . "<br>";
-    echo "Reg date: " . $reg_date . "<br>";
-    echo "Visit date: " . $visit_date . "<br>";
-}
+//    echo "<hr>Login: " . $login . "<br>";
+//    echo "Pass: " . $password . "<br>";
+//    echo "Ip: " . $ip . "<br>";
+//    echo "Reg date: " . $reg_date . "<br>";
+//    echo "Visit date: " . $visit_date . "<br>";
+
+        $sql .= "('{$login}', 
+                  '{$password}', 
+                  '{$reg_date}', 
+                  '{$visit_date}',
+                  '{$ip}')";
+        if ($i<($userCount - 1)) $sql .= ", ";
+    }
+
+$connect->query($sql);
+
+echo "<br>";
+echo mysqli_error($connect);
