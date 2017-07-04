@@ -7,10 +7,11 @@ $mysql_user = 'root';
 $mysql_password = '123456';
 $mysql_database = 'mydb';
 
-$users_count = 1000;
+$users_count = 10;
 $items_count = 2;
 $partners_count = 10;
 $orders_count = 1000;
+$item_price = 1000;
 
 $connect = new mysqli($mysql_host, $mysql_user, $mysql_password);
 
@@ -78,10 +79,6 @@ $sql = "CREATE TABLE Users_Groups (
         FOREIGN KEY (group_id) REFERENCES Groups(id)
 )";
 $connect->query($sql);
-
-echo "<br>";
-echo mysqli_error($connect);
-
 
 function generate_login($faker)
 {
@@ -190,21 +187,17 @@ function add_partners($connect, $partners_count)
     }
     $sql .= "('no partner')";
     $connect->query($sql);
-    echo "<br>";
-    echo mysqli_error($connect);
 }
 
-function add_items($connect, $items_count)
+function add_items($connect, $items_count, $item_price)
 {
     $sql = "INSERT INTO Items (item_name, item_price) VALUES ";
     for ($i = 1; $i < ($items_count+1); $i++){
-        $item_price = $i * 1000;
-        $sql .= "('Item{$i}', '{$item_price}'),";
+        $price = $i * $item_price;
+        $sql .= "('Item{$i}', '{$price}'),";
         if ($i == ($items_count)) $sql = substr($sql, 0, -1);
     }
     $connect->query($sql);
-    echo "<br>";
-    echo mysqli_error($connect);
 }
 
 function add_orders($connect, $orders_count, $users_count, $items_count, $partners_count)
@@ -219,30 +212,6 @@ function add_orders($connect, $orders_count, $users_count, $items_count, $partne
         if ($i == ($orders_count)) $sql = substr($sql, 0, -1);
     }
     $connect->query($sql);
-    echo "<br>";
-    echo mysqli_error($connect);
-}
-
-function get_purchases_no_partners($connect, $partners_count)
-{
-    $partner_id = $partners_count + 1;
-    $purchases = get_purchases_by_user($connect, $partner_id);
-
-    foreach ($purchases as $purchase){
-        $user_id = $purchase['user_id'];
-        $sql = "SELECT * FROM Users WHERE id={$user_id}";
-        $result = $connect->query($sql);
-        $result = $result->fetch_assoc();
-        $total_items = $purchase['item1'] + $purchase['item2'];
-        $total_usd = $purchase['item1']*1000 + $purchase['item2']*1000*2;
-
-        echo "<hr>";
-        echo "User: " . $result['login'] . "<br>";
-        echo "Item1: " . $purchase['item1'] . "pcs | " . $purchase['item1']*1000 . "$<br>";
-        echo "Item2: " . $purchase['item2'] . "pcs | " . $purchase['item2']*1000*2 . "$<br>";
-        echo "Total: " . $total_items . " items<br>";
-        echo "Total: " . $total_usd . "$<br>";
-    }
 }
 
 function get_purchases_by_user($connect, $partner_id)
@@ -260,22 +229,53 @@ function get_purchases_by_user($connect, $partner_id)
 
     $users_unique = array_unique ($users_with_purchase);
 
-    $purchases_by_users = [];
-
     foreach ($purchases as $purchase){
         foreach ($users_unique as $user_unique){
-            if ($purchase['user_id'] == $user_unique){
-                $user_id = $purchase['user_id'];
-                if (!(isset($purchases_by_users[$user_unique]['item1']))) $purchases_by_users[$user_unique]['item1'] = 0;
-                if (!(isset($purchases_by_users[$user_unique]['item2']))) $purchases_by_users[$user_unique]['item2'] = 0;
-                $purchases_by_users[$user_unique]['user_id'] = $purchase['user_id'];
-                if ($purchase['item_id']==1) {
-                    $purchases_by_users[$user_unique]['item1']++;
-                } else $purchases_by_users[$user_unique]['item2']++;
+            if ($purchase['user_id'] == $user_unique) {
+                $sql = "SELECT * FROM Users WHERE id={$user_unique}";
+                $result = $connect->query($sql);
+                $result = $result->fetch_assoc();
+                if ($result['active']!=0) {
+                    if (!(isset($purchases_by_users[$user_unique]['item1']))) $purchases_by_users[$user_unique]['item1'] = 0;
+                    if (!(isset($purchases_by_users[$user_unique]['item2']))) $purchases_by_users[$user_unique]['item2'] = 0;
+                    $purchases_by_users[$user_unique]['user_id'] = $purchase['user_id'];
+                    if ($purchase['item_id'] == 1) {
+                        $purchases_by_users[$user_unique]['item1']++;
+                    } else $purchases_by_users[$user_unique]['item2']++;
+
+                    $sql = "SELECT * FROM Users WHERE id={$user_unique}";
+                    $result = $connect->query($sql);
+                    $result = $result->fetch_assoc();
+                    $purchases_by_users[$user_unique]['login'] = $result['login'];
+                }
             }
         }
     }
     return $purchases_by_users;
+}
+
+function get_purchases_no_partners($connect, $partners_count)
+{
+    $partner_id = $partners_count + 1;
+    $purchases = get_purchases_by_user($connect, $partner_id);
+
+    $sql = "SELECT * FROM Items";
+    $result = $connect->query($sql);
+    while($row = $result->fetch_assoc()){
+        $items[] = $row;
+    };
+
+    foreach ($purchases as $purchase){
+        $total_items = $purchase['item1'] + $purchase['item2'];
+        $total_usd = $purchase['item1']*$items[0]['item_price'] + $purchase['item2']*$items[1]['item_price'];
+
+        echo "<hr>";
+        echo "User: " . $purchase['login'] . "<br>";
+        echo "Item1: " . $purchase['item1'] . "pcs | " . $purchase['item1']*$items[0]['item_price'] . "$<br>";
+        echo "Item2: " . $purchase['item2'] . "pcs | " . $purchase['item2']*$items[1]['item_price'] . "$<br>";
+        echo "Total: " . $total_items . " items<br>";
+        echo "Total: " . $total_usd . "$<br>";
+    }
 }
 
 function get_purchases_by_partner($connect, $partners_count)
@@ -283,6 +283,7 @@ function get_purchases_by_partner($connect, $partners_count)
     for ($i = 1; $i<=$partners_count; $i++){
         $sql = "SELECT * FROM Orders WHERE partner_id={$i}";
         $result = $connect->query($sql);
+
         while ($row = $result->fetch_assoc()) {
             $partner_purchases[$i][] = $row;
         };
@@ -312,9 +313,13 @@ function get_partner_usd_by_user($connect, $partners_count, $purchases_by_partne
         $result = $connect->query($sql);
         $row = $result->fetch_assoc();
         $partner_name = $row['partner_name'];
+
         $purchases = get_purchases_by_user($connect, $partner_id);
+
         $total_usd_by_partner[$partner_id] = 0;
+
         echo "<hr>" . $partner_name . "<br>";
+
         foreach ($purchases as $purchase){
             $user_id = $purchase['user_id'];
             $sql = "SELECT * FROM Users WHERE id={$user_id}";
@@ -325,7 +330,9 @@ function get_partner_usd_by_user($connect, $partners_count, $purchases_by_partne
             $total_usd_by_partner[$partner_id] += $total_usd;
             echo "<br>User: " . $user_login . " | Total USD: " . $total_usd;
         }
+
         $average_usd = intval($total_usd_by_partner[$partner_id] / $purchases_by_partner[$partner_id]);
+
         echo "<br>Total: " . $total_usd_by_partner[$partner_id] . "$";
         echo "<br>Average by user: " . $average_usd . "$";
     }
@@ -334,7 +341,7 @@ function get_partner_usd_by_user($connect, $partners_count, $purchases_by_partne
 add_users($connect, $users_count);
 users_to_groups($connect, $users_count);
 add_partners($connect, $partners_count);
-add_items($connect, $items_count);
+add_items($connect, $items_count, $item_price);
 add_orders($connect, $orders_count, $users_count, $items_count, $partners_count);
 get_purchases_no_partners($connect, $partners_count);
 $purchases_by_partner = get_purchases_by_partner($connect, $partners_count);
