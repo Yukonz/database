@@ -270,7 +270,7 @@ function get_purchases_no_partners($connect, $partners_count)
 {
     $partner_id = $partners_count + 1;
     $purchases = get_purchases($connect, $partner_id);
-    echo "<h3>Purchases by users themselves</h3>";
+    echo "<h3>Purchases by active users themselves</h3>";
     if ($purchases) {
         foreach ($purchases as $purchase) {
             echo "<hr>";
@@ -315,7 +315,7 @@ function get_purchases_by_partner($connect, $partners_count)
     return $purchased_by_partner;
 }
 
-function get_partner_usd_by_user($connect, $partners_count, $purchased_by_partner)
+function get_partner_amount_for_user($connect, $partners_count, $purchased_by_partner)
 {
     echo "<h3>The amount spent on users</h3>";
 
@@ -352,4 +352,4 @@ add_orders($connect, $orders_count, $users_count, $items_count, $partners_count)
 
 get_purchases_no_partners($connect, $partners_count);
 $purchased_by_partner = get_purchases_by_partner($connect, $partners_count);
-get_partner_usd_by_user($connect, $partners_count, $purchased_by_partner);
+get_partner_amount_for_user($connect, $partners_count, $purchased_by_partner);
